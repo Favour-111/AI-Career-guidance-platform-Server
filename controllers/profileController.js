@@ -104,13 +104,27 @@ const updateSkills = async (req, res, next) => {
       return res.status(400).json({ message: "Skills must be an array" });
     }
 
-    let profile = await Profile.findOne({ user: req.user._id });
-    if (!profile) {
-      profile = new Profile({ user: req.user._id });
-    }
-    profile.skills = skills;
+    // Use findOneAndUpdate with $set to avoid Mongoose VersionError
+    // caused by rapid concurrent saves (e.g. add skill then remove quickly)
+    let profile = await Profile.findOneAndUpdate(
+      { user: req.user._id },
+      { $set: { skills } },
+      { new: true, upsert: true }
+    );
 
-    await profile.save(); // triggers completionPercentage pre-save hook
+    // Recompute completionPercentage (pre-save hook doesn't fire on findOneAndUpdate)
+    const fields = [
+      profile.bio,
+      profile.location,
+      profile.skills?.length > 0,
+      profile.interests?.length > 0,
+      profile.education?.length > 0,
+      profile.targetCareer,
+      profile.careerGoals,
+      profile.fieldOfStudy,
+    ];
+    const pct = Math.round(fields.filter(Boolean).length / fields.length * 100);
+    await Profile.findByIdAndUpdate(profile._id, { $set: { completionPercentage: pct } });
 
     await ActivityLog.create({
       user: req.user._id,
@@ -121,7 +135,7 @@ const updateSkills = async (req, res, next) => {
     res.json({
       message: "Skills updated successfully",
       skills: profile.skills,
-      completionPercentage: profile.completionPercentage,
+      completionPercentage: pct,
     });
   } catch (error) {
     next(error);

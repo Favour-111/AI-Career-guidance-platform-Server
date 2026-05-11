@@ -27,6 +27,8 @@ const marketDataSchema = new mongoose.Schema(
     companies: [{ type: String }],
     trending: { type: Boolean, default: false },
     remote: { type: Boolean, default: false },
+    region: { type: String, default: "Nigeria" },
+    currency: { type: String, default: "NGN" },
   },
   { timestamps: true },
 );

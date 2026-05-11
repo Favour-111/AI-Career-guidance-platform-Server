@@ -6,11 +6,13 @@ const {
   getInDemandSkills,
   getMarketStats,
   getCareerMarketData,
+  getLiveJobs,
 } = require("../controllers/marketController");
 
 router.get("/careers", protect, getTrendingCareers);
 router.get("/skills", protect, getInDemandSkills);
 router.get("/stats", protect, getMarketStats);
+router.get("/live-jobs", protect, getLiveJobs);
 router.get("/careers/:careerId", protect, getCareerMarketData);
 
 module.exports = router;
