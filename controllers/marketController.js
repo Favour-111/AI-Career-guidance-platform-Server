@@ -168,7 +168,7 @@ const getLiveJobs = async (req, res, next) => {
     const safeQuery = query.replace(/[^a-zA-Z0-9\s\-]/g, "").trim().slice(0, 100);
     const museCategory = CAREER_TO_MUSE_CATEGORY(safeQuery);
 
-    // Build base params  category narrows to the right field
+    // Build base params — category narrows to the right field
     const baseParams = { descending: true };
     if (museCategory) baseParams.category = museCategory;
 
@@ -199,7 +199,7 @@ const getLiveJobs = async (req, res, next) => {
       return { ...job, _score: score };
     });
 
-    // STRICT filter  only keep jobs where at least 1 title word matches the query
+    // STRICT filter — only keep jobs where at least 1 title word matches the query
     // (prevents "iOS Developer" showing up under "Full Stack Web Developer")
     let filtered = scored.filter((j) => j._score > 0);
 
