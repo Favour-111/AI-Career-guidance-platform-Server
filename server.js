@@ -14,6 +14,7 @@ const profileRoutes = require("./routes/profileRoutes");
 const recommendationRoutes = require("./routes/recommendationRoutes");
 const marketRoutes = require("./routes/marketRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const chatbotRoutes = require("./routes/chatbotRoutes");
 
 // Connect to MongoDB
 connectDB();
@@ -82,6 +83,7 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/recommendations", recommendationRoutes);
 app.use("/api/market", marketRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/chatbot", chatbotRoutes);
 
 // Error handling
 app.use(notFound);
