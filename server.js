@@ -4,6 +4,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const mongoSanitize = require("express-mongo-sanitize");
+const path = require("path");
 const connectDB = require("./config/db");
 const { errorHandler, notFound } = require("./middleware/errorMiddleware");
 const { globalLimiter } = require("./middleware/rateLimiter");
@@ -65,7 +66,7 @@ if (process.env.NODE_ENV === "development") {
 app.use(globalLimiter);
 
 // Static files for uploads
-app.use("/uploads", express.static("uploads"));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Health check
 app.get("/api/health", (req, res) => {

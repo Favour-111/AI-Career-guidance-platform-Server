@@ -889,6 +889,249 @@ const MARKET_DATA = [
   },
 ];
 
+const EXTENDED_MARKET_DATA = [
+  {
+    careerId: "business_analyst",
+    title: "Business Analyst",
+    category: "Business & Management",
+    description:
+      "Analyze business requirements, map processes, and translate needs into actionable product and technical plans.",
+    demandLevel: "High",
+    averageSalary: { entry: 1500000, mid: 3600000, senior: 7800000 },
+    growthRate: 13,
+    jobOpenings: 5200,
+    trending: true,
+    remote: true,
+    region: "Nigeria",
+    currency: "NGN",
+    topSkills: [
+      { name: "Requirements Analysis", importance: 10 },
+      { name: "Process Mapping", importance: 9 },
+      { name: "Stakeholder Management", importance: 9 },
+      { name: "SQL", importance: 7 },
+      { name: "Data Visualization", importance: 8 },
+      { name: "Documentation", importance: 8 },
+    ],
+    companies: ["Interswitch", "Flutterwave", "Andela", "MTN Nigeria", "Moniepoint"],
+  },
+  {
+    careerId: "qa_engineer",
+    title: "QA Engineer",
+    category: "Technology",
+    description:
+      "Ensure product quality through structured testing, automation, and release readiness checks.",
+    demandLevel: "High",
+    averageSalary: { entry: 1200000, mid: 3000000, senior: 6600000 },
+    growthRate: 15,
+    jobOpenings: 4300,
+    trending: true,
+    remote: true,
+    region: "Nigeria",
+    currency: "NGN",
+    topSkills: [
+      { name: "Test Planning", importance: 9 },
+      { name: "Selenium", importance: 8 },
+      { name: "API Testing", importance: 9 },
+      { name: "Cypress", importance: 8 },
+      { name: "Bug Tracking", importance: 8 },
+      { name: "CI/CD", importance: 7 },
+    ],
+    companies: ["Paystack", "Kuda", "Termii", "TeamApt", "PiggyVest"],
+  },
+  {
+    careerId: "sales_manager",
+    title: "Sales Manager",
+    category: "Business & Management",
+    description:
+      "Lead sales teams, design revenue strategy, and grow pipelines across B2B and B2C channels.",
+    demandLevel: "High",
+    averageSalary: { entry: 1200000, mid: 2800000, senior: 7200000 },
+    growthRate: 12,
+    jobOpenings: 9100,
+    trending: true,
+    remote: false,
+    region: "Nigeria",
+    currency: "NGN",
+    topSkills: [
+      { name: "Negotiation", importance: 10 },
+      { name: "CRM", importance: 8 },
+      { name: "Pipeline Management", importance: 9 },
+      { name: "Communication", importance: 10 },
+      { name: "Forecasting", importance: 8 },
+      { name: "Leadership", importance: 9 },
+    ],
+    companies: ["Airtel Nigeria", "MTN Nigeria", "Dangote Group", "Jumia", "Nestle Nigeria"],
+  },
+  {
+    careerId: "supply_chain_manager",
+    title: "Supply Chain Manager",
+    category: "Operations",
+    description:
+      "Optimize procurement, warehousing, and distribution to improve service levels and costs.",
+    demandLevel: "High",
+    averageSalary: { entry: 1800000, mid: 3600000, senior: 8400000 },
+    growthRate: 11,
+    jobOpenings: 4700,
+    trending: false,
+    remote: false,
+    region: "Nigeria",
+    currency: "NGN",
+    topSkills: [
+      { name: "Logistics", importance: 10 },
+      { name: "Inventory Management", importance: 9 },
+      { name: "Procurement", importance: 9 },
+      { name: "ERP Systems", importance: 8 },
+      { name: "Analytics", importance: 7 },
+      { name: "Vendor Management", importance: 8 },
+    ],
+    companies: ["Dangote Group", "Unilever Nigeria", "Flour Mills Nigeria", "Nestle Nigeria", "Jumia"],
+  },
+  {
+    careerId: "customer_success_manager",
+    title: "Customer Success Manager",
+    category: "Business & Management",
+    description:
+      "Drive customer retention and account growth through onboarding, product adoption, and strategic support.",
+    demandLevel: "High",
+    averageSalary: { entry: 1200000, mid: 3000000, senior: 6600000 },
+    growthRate: 18,
+    jobOpenings: 3900,
+    trending: true,
+    remote: true,
+    region: "Nigeria",
+    currency: "NGN",
+    topSkills: [
+      { name: "Relationship Management", importance: 10 },
+      { name: "Product Knowledge", importance: 9 },
+      { name: "Communication", importance: 10 },
+      { name: "Data Analysis", importance: 7 },
+      { name: "CRM", importance: 8 },
+      { name: "Renewal Strategy", importance: 8 },
+    ],
+    companies: ["Paystack", "Flutterwave", "Hubtel", "Moniepoint", "Andela"],
+  },
+  {
+    careerId: "dentist",
+    title: "Dentist",
+    category: "Medical & Health",
+    description:
+      "Diagnose and treat oral health conditions, and perform preventive and restorative dental procedures.",
+    demandLevel: "High",
+    averageSalary: { entry: 2400000, mid: 6000000, senior: 12000000 },
+    growthRate: 8,
+    jobOpenings: 2400,
+    trending: false,
+    remote: false,
+    region: "Nigeria",
+    currency: "NGN",
+    topSkills: [
+      { name: "Oral Diagnosis", importance: 10 },
+      { name: "Patient Care", importance: 9 },
+      { name: "Dental Procedures", importance: 10 },
+      { name: "Infection Control", importance: 9 },
+      { name: "Communication", importance: 8 },
+      { name: "Medical Ethics", importance: 8 },
+    ],
+    companies: ["Lagos University Teaching Hospital", "Reddington Hospital", "St. Nicholas Hospital", "Eko Dental Clinic", "Smile 360"],
+  },
+  {
+    careerId: "physiotherapist",
+    title: "Physiotherapist",
+    category: "Medical & Health",
+    description:
+      "Help patients recover mobility and function through targeted therapy plans and rehabilitation programs.",
+    demandLevel: "High",
+    averageSalary: { entry: 1500000, mid: 3000000, senior: 6600000 },
+    growthRate: 14,
+    jobOpenings: 3100,
+    trending: true,
+    remote: false,
+    region: "Nigeria",
+    currency: "NGN",
+    topSkills: [
+      { name: "Rehabilitation", importance: 10 },
+      { name: "Patient Assessment", importance: 9 },
+      { name: "Exercise Therapy", importance: 9 },
+      { name: "Communication", importance: 8 },
+      { name: "Anatomy", importance: 8 },
+      { name: "Care Planning", importance: 8 },
+    ],
+    companies: ["National Orthopaedic Hospital", "LUTH", "Evercare Hospital", "Eko Hospital", "Hygeia HMO"],
+  },
+  {
+    careerId: "architect",
+    title: "Architect",
+    category: "Engineering",
+    description:
+      "Plan and design buildings and spaces that are functional, safe, and sustainable.",
+    demandLevel: "Medium",
+    averageSalary: { entry: 1200000, mid: 3000000, senior: 7800000 },
+    growthRate: 9,
+    jobOpenings: 2100,
+    trending: false,
+    remote: true,
+    region: "Nigeria",
+    currency: "NGN",
+    topSkills: [
+      { name: "Architectural Design", importance: 10 },
+      { name: "AutoCAD", importance: 9 },
+      { name: "Revit", importance: 8 },
+      { name: "3D Visualization", importance: 8 },
+      { name: "Building Codes", importance: 8 },
+      { name: "Project Coordination", importance: 8 },
+    ],
+    companies: ["Julius Berger", "CCECC", "Design Group Nigeria", "ArchiView", "Elalan Construction"],
+  },
+  {
+    careerId: "biotechnologist",
+    title: "Biotechnologist",
+    category: "Science & Research",
+    description:
+      "Apply biological science to develop products and processes in health, agriculture, and industry.",
+    demandLevel: "Medium",
+    averageSalary: { entry: 1500000, mid: 3600000, senior: 7800000 },
+    growthRate: 16,
+    jobOpenings: 1500,
+    trending: true,
+    remote: false,
+    region: "Nigeria",
+    currency: "NGN",
+    topSkills: [
+      { name: "Molecular Biology", importance: 10 },
+      { name: "Laboratory Techniques", importance: 9 },
+      { name: "Data Analysis", importance: 7 },
+      { name: "Research Methods", importance: 9 },
+      { name: "Scientific Writing", importance: 8 },
+      { name: "Quality Control", importance: 8 },
+    ],
+    companies: ["Nigerian Institute of Medical Research", "IITA", "NOTAP", "Biovaccines Nigeria", "NABDA"],
+  },
+  {
+    careerId: "game_developer",
+    title: "Game Developer",
+    category: "Technology",
+    description:
+      "Build interactive game experiences across mobile, desktop, and web platforms.",
+    demandLevel: "Medium",
+    averageSalary: { entry: 1500000, mid: 3600000, senior: 9000000 },
+    growthRate: 20,
+    jobOpenings: 1200,
+    trending: true,
+    remote: true,
+    region: "Nigeria",
+    currency: "NGN",
+    topSkills: [
+      { name: "Unity", importance: 10 },
+      { name: "C#", importance: 9 },
+      { name: "Game Design", importance: 9 },
+      { name: "3D Math", importance: 8 },
+      { name: "Debugging", importance: 8 },
+      { name: "Version Control", importance: 7 },
+    ],
+    companies: ["Maliyo Games", "Gamsole", "Kuluya", "ChopUp", "Dimension11"],
+  },
+];
+
 const seedDB = async () => {
   try {
     await mongoose.connect(
@@ -896,15 +1139,17 @@ const seedDB = async () => {
     );
     console.log("Connected to MongoDB");
 
+    const allMarketData = [...MARKET_DATA, ...EXTENDED_MARKET_DATA];
+
     // Seed market data
-    for (const data of MARKET_DATA) {
+    for (const data of allMarketData) {
       await MarketData.findOneAndUpdate(
         { careerId: data.careerId },
         { $set: data },
         { upsert: true },
       );
     }
-    console.log(`✅ Seeded ${MARKET_DATA.length} career market records`);
+    console.log(`✅ Seeded ${allMarketData.length} career market records`);
 
     // Create default admin
     const adminExists = await User.findOne({

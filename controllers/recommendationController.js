@@ -156,15 +156,9 @@ const generateRecommendations = async (req, res, next) => {
       });
     }
 
-    if (!profile.skills || profile.skills.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "Please add at least one skill to your profile" });
-    }
-
     const payload = {
       user_id: req.user._id.toString(),
-      skills: profile.skills.map((s) => ({ name: s.name, level: s.level })),
+      skills: (profile.skills || []).map((s) => ({ name: s.name, level: s.level })),
       interests: profile.interests || [],
       target_career: profile.targetCareer || null,
       field: profile.fieldOfStudy || null,
@@ -190,7 +184,7 @@ const generateRecommendations = async (req, res, next) => {
       user: req.user._id,
       careers: mlResponse.recommendations,
       inputSnapshot: {
-        skills: profile.skills.map((s) => ({ name: s.name, level: s.level })),
+        skills: (profile.skills || []).map((s) => ({ name: s.name, level: s.level })),
         interests: profile.interests || [],
       },
     });

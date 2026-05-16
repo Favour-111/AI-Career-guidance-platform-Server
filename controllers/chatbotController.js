@@ -1,5 +1,6 @@
 const axios = require("axios");
 const ChatSession = require("../models/ChatSession");
+const Profile = require("../models/Profile");
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://localhost:8000";
 const GROQ_API_BASE_URL = process.env.GROQ_API_BASE_URL || "https://api.groq.com/openai/v1";
@@ -260,7 +261,17 @@ exports.chatWithBot = async (req, res) => {
 // @access  Private
 exports.interviewTurn = async (req, res) => {
   try {
-    const { role, focus, question, answer, history = [] } = req.body || {};
+    const {
+      role,
+      focus,
+      question,
+      answer,
+      history = [],
+      fieldOfStudy,
+      targetCareer,
+      interests = [],
+      skills = [],
+    } = req.body || {};
 
     if (!question || typeof question !== "string") {
       return res.status(400).json({ error: "Question is required." });
@@ -274,6 +285,46 @@ exports.interviewTurn = async (req, res) => {
       return res.status(400).json({ error: "Answer cannot be empty." });
     }
 
+    const savedProfile = await Profile.findOne({ user: req.user._id })
+      .select("fieldOfStudy targetCareer interests skills")
+      .lean();
+
+    const mergedFieldOfStudy =
+      (typeof fieldOfStudy === "string" && fieldOfStudy.trim()) ||
+      (typeof savedProfile?.fieldOfStudy === "string" && savedProfile.fieldOfStudy.trim()) ||
+      "";
+    const mergedTargetCareer =
+      (typeof targetCareer === "string" && targetCareer.trim()) ||
+      (typeof savedProfile?.targetCareer === "string" && savedProfile.targetCareer.trim()) ||
+      "";
+
+    const mergedInterests = [
+      ...(Array.isArray(interests) ? interests : []),
+      ...(Array.isArray(savedProfile?.interests) ? savedProfile.interests : []),
+    ]
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+      .filter((item, idx, arr) => arr.findIndex((v) => v.toLowerCase() === item.toLowerCase()) === idx)
+      .slice(0, 10);
+
+    const mergedSkills = [
+      ...(Array.isArray(skills) ? skills : []),
+      ...((savedProfile?.skills || []).map((s) => s?.name) || []),
+    ]
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+      .filter((item, idx, arr) => arr.findIndex((v) => v.toLowerCase() === item.toLowerCase()) === idx)
+      .slice(0, 12);
+
+    const candidateContext = [
+      mergedFieldOfStudy ? `Field of study: ${mergedFieldOfStudy}` : null,
+      mergedTargetCareer ? `Target career: ${mergedTargetCareer}` : null,
+      mergedInterests.length ? `Interests: ${mergedInterests.join(", ")}` : null,
+      mergedSkills.length ? `Top skills: ${mergedSkills.join(", ")}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
     const serializedHistory = Array.isArray(history)
       ? history.slice(-6).map((h) => `Q: ${h.question || ""}\nA: ${h.answer || ""}`).join("\n\n")
       : "";
@@ -283,11 +334,11 @@ exports.interviewTurn = async (req, res) => {
         {
           role: "system",
           content:
-            "You are a senior technical interviewer. Evaluate answers realistically and return strict JSON only. JSON keys: score (number 0-100), communication (string), technical (string), strengths (string array), improvements (string array), suggestedAnswer (string), followUpQuestion (string).",
+            "You are a senior interviewer. Evaluate answers realistically and return strict JSON only. JSON keys: score (number 0-100), communication (string), technical (string), strengths (string array), improvements (string array), suggestedAnswer (string), followUpQuestion (string). If candidate context has a field of study or target career, the followUpQuestion must be specific to that field/career and not generic.",
         },
         {
           role: "user",
-          content: `Role: ${role || "General"}\nFocus: ${focus || "General interview performance"}\nCurrent question: ${question}\nCandidate answer: ${trimmedAnswer}\nRecent context:\n${serializedHistory || "None"}\n\nReturn strict JSON only with the required keys.`,
+          content: `Role: ${role || "General"}\nFocus: ${focus || "General interview performance"}\nCandidate context:\n${candidateContext || "None"}\nCurrent question: ${question}\nCandidate answer: ${trimmedAnswer}\nRecent context:\n${serializedHistory || "None"}\n\nReturn strict JSON only with the required keys.`,
         },
       ],
       temperature: 0.35,
@@ -300,6 +351,15 @@ exports.interviewTurn = async (req, res) => {
       return res.json({ ...fallback, fallback: true, warning: "AI response format issue, using fallback analysis." });
     }
 
+    let followUpQuestion =
+      typeof parsed.followUpQuestion === "string"
+        ? parsed.followUpQuestion
+        : "Can you give a concrete example with measurable impact?";
+
+    if (mergedFieldOfStudy && !new RegExp(mergedFieldOfStudy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(followUpQuestion)) {
+      followUpQuestion = `In ${mergedFieldOfStudy}, ${followUpQuestion.charAt(0).toLowerCase()}${followUpQuestion.slice(1)}`;
+    }
+
     const normalized = {
       score: Number.isFinite(Number(parsed.score)) ? Math.max(0, Math.min(100, Math.round(Number(parsed.score)))) : 60,
       communication: typeof parsed.communication === "string" ? parsed.communication : "Developing",
@@ -307,7 +367,7 @@ exports.interviewTurn = async (req, res) => {
       strengths: Array.isArray(parsed.strengths) ? parsed.strengths.filter((s) => typeof s === "string").slice(0, 5) : [],
       improvements: Array.isArray(parsed.improvements) ? parsed.improvements.filter((s) => typeof s === "string").slice(0, 6) : [],
       suggestedAnswer: typeof parsed.suggestedAnswer === "string" ? parsed.suggestedAnswer : "Use STAR and include measurable impact.",
-      followUpQuestion: typeof parsed.followUpQuestion === "string" ? parsed.followUpQuestion : "Can you give a concrete example with measurable impact?",
+      followUpQuestion,
     };
 
     return res.json(normalized);
