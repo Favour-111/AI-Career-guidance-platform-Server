@@ -22,6 +22,7 @@ connectDB();
 
 const app = express();
 
+  
 const defaultAllowedOrigins = [
   "http://localhost:5173",
   "https://ai-career-guidance-platform-fronten-theta.vercel.app",
@@ -30,7 +31,7 @@ const defaultAllowedOrigins = [
 
 const allowedOrigins = [
   ...defaultAllowedOrigins,
-  ...(process.env.CLIENT_URL || "")
+  ...(process.env.CLIENT_URL || "https://ai-career-guidance-platform-fronten-theta.vercel.app")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
