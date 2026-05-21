@@ -22,6 +22,34 @@ connectDB();
 
 const app = express();
 
+const defaultAllowedOrigins = [
+  "http://localhost:5173",
+  "https://ai-career-guidance-platform-fronten-theta.vercel.app",
+  "https://ai-career-guidance-platform-frontend-theta.vercel.app",
+];
+
+const allowedOrigins = [
+  ...defaultAllowedOrigins,
+  ...(process.env.CLIENT_URL || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+];
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`Not allowed by CORS: ${origin}`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 204,
+};
+
 /*
 =========================
 Security
@@ -40,40 +68,8 @@ CORS
 =========================
 */
 
-app.use((req, res, next) => {
-  res.header(
-    "Access-Control-Allow-Origin",
-    req.headers.origin || "*",
-  );
-
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization",
-  );
-
-  res.header(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-  );
-
-  res.header(
-    "Access-Control-Allow-Credentials",
-    "true",
-  );
-
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(200);
-  }
-
-  next();
-});
-
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-  }),
-);
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 /*
 =========================
@@ -138,10 +134,12 @@ app.use("/api/chatbot", chatbotRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5001;
+if (require.main === module) {
+  const PORT = process.env.PORT || 5001;
 
-app.listen(PORT, () => {
-  console.log(`Running on ${PORT}`);
-});
+  app.listen(PORT, () => {
+    console.log(`Running on ${PORT}`);
+  });
+}
 
 module.exports = app;
