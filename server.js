@@ -1,10 +1,12 @@
 require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const mongoSanitize = require("express-mongo-sanitize");
 const path = require("path");
+
 const connectDB = require("./config/db");
 const { errorHandler, notFound } = require("./middleware/errorMiddleware");
 const { globalLimiter } = require("./middleware/rateLimiter");
@@ -17,87 +19,149 @@ const marketRoutes = require("./routes/marketRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const chatbotRoutes = require("./routes/chatbotRoutes");
 
-// Connect to MongoDB
+// Connect DB
 connectDB();
 
 const app = express();
 
-// Security middleware
+/*
+|--------------------------------------------------------------------------
+| SECURITY
+|--------------------------------------------------------------------------
+*/
+
 app.use(
   helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginResourcePolicy: {
+      policy: "cross-origin",
+    },
   }),
 );
 
-// CORS configuration
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  process.env.CLIENT_URL,
-].filter(Boolean);
+/*
+|--------------------------------------------------------------------------
+| CORS (ALLOW ANY ORIGIN)
+|--------------------------------------------------------------------------
+*/
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, Postman)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS: origin ${origin} not allowed`));
-    },
+    origin: true, // automatically reflects requesting origin
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Origin",
+      "Accept",
+    ],
   }),
 );
 
-// Body parsing
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+// Handle browser preflight requests
+app.options("*", cors());
 
-// MongoDB query sanitization (prevent NoSQL injection)
+/*
+|--------------------------------------------------------------------------
+| BODY PARSER
+|--------------------------------------------------------------------------
+*/
+
+app.use(express.json({ limit: "10mb" }));
+
+app.use(
+  express.urlencoded({
+    extended: true,
+    limit: "10mb",
+  }),
+);
+
+/*
+|--------------------------------------------------------------------------
+| SANITIZE REQUESTS
+|--------------------------------------------------------------------------
+*/
+
 app.use(mongoSanitize());
 
-// HTTP request logging (dev only)
+/*
+|--------------------------------------------------------------------------
+| LOGGER
+|--------------------------------------------------------------------------
+*/
+
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-// Global rate limiter
+/*
+|--------------------------------------------------------------------------
+| RATE LIMITER
+|--------------------------------------------------------------------------
+*/
+
 app.use(globalLimiter);
 
-// Static files for uploads
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+/*
+|--------------------------------------------------------------------------
+| STATIC FILES
+|--------------------------------------------------------------------------
+*/
 
-// Health check
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "uploads")),
+);
+
+/*
+|--------------------------------------------------------------------------
+| HEALTH CHECK
+|--------------------------------------------------------------------------
+*/
+
 app.get("/api/health", (req, res) => {
-  res.json({
+  res.status(200).json({
+    success: true,
     status: "OK",
     message: "AI Career Guidance API is running",
-    timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString(),
   });
 });
 
-// API Routes
+/*
+|--------------------------------------------------------------------------
+| ROUTES
+|--------------------------------------------------------------------------
+*/
+
 app.use("/api/auth", authRoutes);
+
 app.use("/api/profile", profileRoutes);
+
 app.use("/api/recommendations", recommendationRoutes);
+
 app.use("/api/market", marketRoutes);
+
 app.use("/api/admin", adminRoutes);
+
 app.use("/api/chatbot", chatbotRoutes);
 
-// Error handling
+
 app.use(notFound);
+
+
 app.use(errorHandler);
+
 
 const PORT = process.env.PORT || 5001;
 
 app.listen(PORT, () => {
-  console.log(
-    `\n🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`,
-  );
-  console.log(`📡 API: http://localhost:${PORT}/api`);
-  console.log(`🏥 Health: http://localhost:${PORT}/api/health\n`);
+  console.log(`
+🚀 Server running in ${process.env.NODE_ENV} mode
+📡 API: http://localhost:${PORT}/api
+🏥 Health: http://localhost:${PORT}/api/health
+`);
 });
 
 module.exports = app;
