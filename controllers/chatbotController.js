@@ -2,7 +2,7 @@ const axios = require("axios");
 const ChatSession = require("../models/ChatSession");
 const Profile = require("../models/Profile");
 
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://localhost:8000";
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://127.0.0.1:8000";
 const GROQ_API_BASE_URL = process.env.GROQ_API_BASE_URL || "https://api.groq.com/openai/v1";
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
@@ -128,6 +128,15 @@ const appendChatMessages = async (userId, messages) => {
       setDefaultsOnInsert: true,
     },
   );
+};
+
+const callMlInterviewTurn = async (payload) => {
+  const response = await axios.post(`${ML_SERVICE_URL}/interview-turn`, payload, {
+    timeout: 12000,
+    headers: { "Content-Type": "application/json" },
+  });
+
+  return response.data;
 };
 
 // @desc    Get chatbot history for current user
@@ -329,23 +338,46 @@ exports.interviewTurn = async (req, res) => {
       ? history.slice(-6).map((h) => `Q: ${h.question || ""}\nA: ${h.answer || ""}`).join("\n\n")
       : "";
 
-    const content = await callGroqChat({
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a senior interviewer. Evaluate answers realistically and return strict JSON only. JSON keys: score (number 0-100), communication (string), technical (string), strengths (string array), improvements (string array), suggestedAnswer (string), followUpQuestion (string). If candidate context has a field of study or target career, the followUpQuestion must be specific to that field/career and not generic.",
-        },
-        {
-          role: "user",
-          content: `Role: ${role || "General"}\nFocus: ${focus || "General interview performance"}\nCandidate context:\n${candidateContext || "None"}\nCurrent question: ${question}\nCandidate answer: ${trimmedAnswer}\nRecent context:\n${serializedHistory || "None"}\n\nReturn strict JSON only with the required keys.`,
-        },
-      ],
-      temperature: 0.35,
-      maxTokens: 700,
-    });
+    let parsed = null;
+    let usedMlFallback = false;
 
-    const parsed = tryParseJson(content);
+    try {
+      const content = await callGroqChat({
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a senior interviewer. Evaluate answers realistically and return strict JSON only. JSON keys: score (number 0-100), communication (string), technical (string), strengths (string array), improvements (string array), suggestedAnswer (string), followUpQuestion (string). If candidate context has a field of study or target career, the followUpQuestion must be specific to that field/career and not generic.",
+          },
+          {
+            role: "user",
+            content: `Role: ${role || "General"}\nFocus: ${focus || "General interview performance"}\nCandidate context:\n${candidateContext || "None"}\nCurrent question: ${question}\nCandidate answer: ${trimmedAnswer}\nRecent context:\n${serializedHistory || "None"}\n\nReturn strict JSON only with the required keys.`,
+          },
+        ],
+        temperature: 0.35,
+        maxTokens: 700,
+      });
+
+      parsed = tryParseJson(content);
+    } catch (groqError) {
+      console.error("Groq interview error:", groqError.message);
+      try {
+        parsed = await callMlInterviewTurn({
+          role,
+          focus,
+          question,
+          answer: trimmedAnswer,
+          fieldOfStudy: mergedFieldOfStudy,
+          targetCareer: mergedTargetCareer,
+          interests: mergedInterests,
+          skills: mergedSkills,
+        });
+        usedMlFallback = true;
+      } catch (mlError) {
+        console.error("ML interview fallback error:", mlError.message);
+      }
+    }
+
     if (!parsed) {
       const fallback = buildInterviewFallback({ role, question, answer: trimmedAnswer });
       return res.json({ ...fallback, fallback: true, warning: "AI response format issue, using fallback analysis." });
@@ -370,7 +402,11 @@ exports.interviewTurn = async (req, res) => {
       followUpQuestion,
     };
 
-    return res.json(normalized);
+    return res.json({
+      ...normalized,
+      fallback: usedMlFallback,
+      warning: usedMlFallback ? "Primary AI unavailable; using ML service interview analysis." : null,
+    });
   } catch (err) {
     console.error("Interview turn error:", err.message);
     const fallback = buildInterviewFallback(req.body || {});

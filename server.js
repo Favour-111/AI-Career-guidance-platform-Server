@@ -105,4 +105,13 @@ ERROR HANDLERS LAST
 app.use(notFound);
 app.use(errorHandler);
 
+const PORT = process.env.PORT || 5001;
+const HOST = process.env.HOST || "127.0.0.1";
+
+if (require.main === module) {
+  app.listen(PORT, HOST, () => {
+    console.log(`API server running at http://${HOST}:${PORT}`);
+  });
+}
+
 module.exports = app;
