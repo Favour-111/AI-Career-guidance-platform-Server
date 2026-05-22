@@ -22,70 +22,45 @@ connectDB();
 
 const app = express();
 
-  
-const defaultAllowedOrigins = [
-  "http://localhost:5173",
-  "https://ai-career-guidance-platform-fronten-theta.vercel.app",
-  "https://ai-career-guidance-platform-frontend-theta.vercel.app",
-];
-
-const allowedOrigins = [
-  ...defaultAllowedOrigins,
-  ...(process.env.CLIENT_URL || "https://ai-career-guidance-platform-fronten-theta.vercel.app")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean),
-];
-
-const corsOptions = {
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error(`Not allowed by CORS: ${origin}`));
-  },
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  optionsSuccessStatus: 204,
-};
-
 /*
 =========================
-Security
+SECURITY HEADERS FIRST
 =========================
 */
-
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
-  }),
+  })
 );
 
 /*
 =========================
-CORS
+CORS (IMPORTANT: BEFORE ROUTES)
 =========================
 */
+const corsOptions = {
+  origin: true, // allows ALL origins
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
 /*
 =========================
-Body Parser
+BODY PARSERS
 =========================
 */
-
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.use(
-  express.urlencoded({
-    extended: true,
-  }),
-);
-
+/*
+=========================
+SECURITY MIDDLEWARE
+=========================
+*/
 app.use(mongoSanitize());
 
 if (process.env.NODE_ENV === "development") {
@@ -96,35 +71,25 @@ app.use(globalLimiter);
 
 /*
 =========================
-Static
+STATIC FILES
 =========================
 */
-
-app.use(
-  "/uploads",
-  express.static(
-    path.join(__dirname, "uploads"),
-  ),
-);
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /*
 =========================
-Health
+HEALTH CHECK
 =========================
 */
-
 app.get("/api/health", (req, res) => {
-  res.json({
-    success: true,
-  });
+  res.json({ success: true });
 });
 
 /*
 =========================
-Routes
+ROUTES
 =========================
 */
-
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/recommendations", recommendationRoutes);
@@ -132,15 +97,12 @@ app.use("/api/market", marketRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/chatbot", chatbotRoutes);
 
+/*
+=========================
+ERROR HANDLERS LAST
+=========================
+*/
 app.use(notFound);
 app.use(errorHandler);
-
-if (require.main === module) {
-  const PORT = process.env.PORT || 5001;
-
-  app.listen(PORT, () => {
-    console.log(`Running on ${PORT}`);
-  });
-}
 
 module.exports = app;
