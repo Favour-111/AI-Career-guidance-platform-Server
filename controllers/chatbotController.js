@@ -1,8 +1,8 @@
 const axios = require("axios");
 const ChatSession = require("../models/ChatSession");
 const Profile = require("../models/Profile");
+const { buildMlServiceUrl } = require("../config/mlService");
 
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://127.0.0.1:8000";
 const GROQ_API_BASE_URL = process.env.GROQ_API_BASE_URL || "https://api.groq.com/openai/v1";
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
@@ -131,7 +131,7 @@ const appendChatMessages = async (userId, messages) => {
 };
 
 const callMlInterviewTurn = async (payload) => {
-  const response = await axios.post(`${ML_SERVICE_URL}/interview-turn`, payload, {
+  const response = await axios.post(buildMlServiceUrl("/interview-turn"), payload, {
     timeout: 12000,
     headers: { "Content-Type": "application/json" },
   });
@@ -210,7 +210,7 @@ exports.chatWithBot = async (req, res) => {
       console.error("Groq chatbot error:", groqError.message);
       try {
         const mlResponse = await axios.post(
-          `${ML_SERVICE_URL}/chatbot`,
+          buildMlServiceUrl("/chatbot"),
           { message: normalizedMessage },
           { timeout: 12000 },
         );

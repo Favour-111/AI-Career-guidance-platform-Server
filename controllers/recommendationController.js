@@ -2,8 +2,7 @@ const axios = require("axios");
 const Profile = require("../models/Profile");
 const Recommendation = require("../models/Recommendation");
 const ActivityLog = require("../models/ActivityLog");
-
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://127.0.0.1:8000";
+const { buildMlServiceUrl } = require("../config/mlService");
 
 const CAREER_FALLBACKS = [
   {
@@ -167,7 +166,7 @@ const generateRecommendations = async (req, res, next) => {
     let mlResponse;
     let usedFallback = false;
     try {
-      const response = await axios.post(`${ML_SERVICE_URL}/predict`, payload, {
+      const response = await axios.post(buildMlServiceUrl("/predict"), payload, {
         timeout: 30000,
         headers: { "Content-Type": "application/json" },
       });

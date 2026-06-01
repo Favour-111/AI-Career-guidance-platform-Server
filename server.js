@@ -8,6 +8,7 @@ const mongoSanitize = require("express-mongo-sanitize");
 const path = require("path");
 
 const connectDB = require("./config/db");
+const { ML_SERVICE_URL } = require("./config/mlService");
 const { errorHandler, notFound } = require("./middleware/errorMiddleware");
 const { globalLimiter } = require("./middleware/rateLimiter");
 
@@ -82,7 +83,12 @@ HEALTH CHECK
 =========================
 */
 app.get("/api/health", (req, res) => {
-  res.json({ success: true });
+  res.json({
+    success: true,
+    services: {
+      ml: ML_SERVICE_URL,
+    },
+  });
 });
 
 /*
