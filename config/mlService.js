@@ -1,6 +1,6 @@
 const LOCAL_ML_SERVICE_URL = "http://127.0.0.1:8000";
 const PRODUCTION_ML_SERVICE_URL =
-  "https://ai-career-guidance-platform-ml-service-mwdv.onrender.com";
+  "https://ai-career-guidance-platform-ml-service.onrender.com";
 
 const stripTrailingSlash = (url) => url.replace(/\/+$/, "");
 
