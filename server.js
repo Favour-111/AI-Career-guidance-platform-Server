@@ -82,13 +82,45 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 HEALTH CHECK
 =========================
 */
-app.get("/api/health", (req, res) => {
-  res.json({
+app.get("/api/health", async (req, res) => {
+  const axios = require("axios");
+  const health = {
     success: true,
-    services: {
-      ml: ML_SERVICE_URL,
+    backend: {
+      status: "ok",
+      timestamp: new Date().toISOString(),
     },
-  });
+    services: {
+      ml: {
+        url: ML_SERVICE_URL,
+        status: "checking",
+        responseTime: null,
+        error: null,
+      },
+    },
+  };
+
+  try {
+    const startTime = Date.now();
+    const mlHealthResponse = await axios.get(`${ML_SERVICE_URL}/health`, {
+      timeout: 5000,
+    });
+    health.services.ml.responseTime = Date.now() - startTime;
+    health.services.ml.status = mlHealthResponse.data?.status === "healthy" ? "ok" : "unhealthy";
+    health.services.ml.data = mlHealthResponse.data;
+  } catch (error) {
+    health.services.ml.status = "unreachable";
+    health.services.ml.error = {
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+    };
+    health.success = false;
+  }
+
+  const statusCode = health.success ? 200 : 503;
+  res.status(statusCode).json(health);
 });
 
 /*

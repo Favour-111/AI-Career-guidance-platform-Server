@@ -193,6 +193,8 @@ exports.chatWithBot = async (req, res) => {
     let reply = "";
     let warning = null;
     let fallback = false;
+    let errorDetails = null;
+    
     try {
       reply = await callGroqChat({
         messages: [
@@ -208,15 +210,25 @@ exports.chatWithBot = async (req, res) => {
       });
     } catch (groqError) {
       console.error("Groq chatbot error:", groqError.message);
+      errorDetails = `Groq failed: ${groqError.message}`;
       try {
+        console.log(`[DEBUG] Attempting ML Service call to: ${buildMlServiceUrl("/chatbot")}`);
         const mlResponse = await axios.post(
           buildMlServiceUrl("/chatbot"),
           { message: normalizedMessage },
           { timeout: 12000 },
         );
         reply = mlResponse.data?.reply || "";
+        console.log("[DEBUG] ML Service succeeded");
       } catch (mlError) {
-        console.error("ML chatbot fallback error:", mlError.message);
+        console.error("ML chatbot fallback error:", {
+          message: mlError.message,
+          status: mlError.response?.status,
+          statusText: mlError.response?.statusText,
+          url: buildMlServiceUrl("/chatbot"),
+          data: mlError.response?.data,
+        });
+        errorDetails += ` | ML Service failed: ${mlError.message} (Status: ${mlError.response?.status || 'no response'})`;
       }
     }
 
@@ -235,7 +247,11 @@ exports.chatWithBot = async (req, res) => {
       console.error("Chat save error:", saveError.message);
     }
 
-    return res.json({ reply, warning, fallback });
+    const response = { reply, warning, fallback };
+    if (process.env.NODE_ENV === "development" && errorDetails) {
+      response.errorDetails = errorDetails;
+    }
+    return res.json(response);
   } catch (err) {
     console.error("Chatbot error:", err.message);
 
@@ -340,6 +356,7 @@ exports.interviewTurn = async (req, res) => {
 
     let parsed = null;
     let usedMlFallback = false;
+    let errorDetails = null;
 
     try {
       const content = await callGroqChat({
@@ -361,7 +378,10 @@ exports.interviewTurn = async (req, res) => {
       parsed = tryParseJson(content);
     } catch (groqError) {
       console.error("Groq interview error:", groqError.message);
+      errorDetails = `Groq failed: ${groqError.message}`;
       try {
+        const mlUrl = buildMlServiceUrl("/interview-turn");
+        console.log(`[DEBUG] Attempting ML Service interview call to: ${mlUrl}`);
         parsed = await callMlInterviewTurn({
           role,
           focus,
@@ -373,14 +393,27 @@ exports.interviewTurn = async (req, res) => {
           skills: mergedSkills,
         });
         usedMlFallback = true;
+        console.log("[DEBUG] ML Service interview succeeded");
       } catch (mlError) {
-        console.error("ML interview fallback error:", mlError.message);
+        console.error("ML interview fallback error:", {
+          message: mlError.message,
+          status: mlError.response?.status,
+          statusText: mlError.response?.statusText,
+          url: buildMlServiceUrl("/interview-turn"),
+          data: mlError.response?.data,
+        });
+        errorDetails += ` | ML Service failed: ${mlError.message} (Status: ${mlError.response?.status || 'no response'})`;
       }
     }
 
     if (!parsed) {
       const fallback = buildInterviewFallback({ role, question, answer: trimmedAnswer });
-      return res.json({ ...fallback, fallback: true, warning: "AI response format issue, using fallback analysis." });
+      return res.json({ 
+        ...fallback, 
+        fallback: true, 
+        warning: "AI response format issue, using fallback analysis.",
+        ...(process.env.NODE_ENV === "development" && { errorDetails })
+      });
     }
 
     let followUpQuestion =
