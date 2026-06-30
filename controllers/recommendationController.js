@@ -1,8 +1,13 @@
 const axios = require("axios");
 const Profile = require("../models/Profile");
 const Recommendation = require("../models/Recommendation");
+const MarketData = require("../models/MarketData");
 const ActivityLog = require("../models/ActivityLog");
 const { buildMlServiceUrl } = require("../config/mlService");
+const {
+  createCareerIndex,
+  enrichRecommendationWithMarketData,
+} = require("../utils/marketInsights");
 
 const CAREER_FALLBACKS = [
   {
@@ -103,44 +108,104 @@ const CAREER_FALLBACKS = [
   },
 ];
 
-const buildFallbackRecommendations = (profile) => {
-  const userSkills = (profile.skills || []).map((skill) => String(skill.name || "").toLowerCase());
-  const userInterests = (profile.interests || []).map((interest) => String(interest || "").toLowerCase());
-  const userText = [
-    String(profile.targetCareer || "").toLowerCase(),
-    String(profile.fieldOfStudy || "").toLowerCase(),
-    ...userInterests,
-  ].join(" ");
+const normalize = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 
-  const scored = CAREER_FALLBACKS.map((career) => {
-    const skillMatches = career.requiredSkills.filter((required) =>
-      userSkills.some((skill) => skill.includes(required) || required.includes(skill)),
+const getCareerKeywords = (career) =>
+  [
+    career.title,
+    career.category,
+    career.description,
+    ...(career.aliases || []),
+    ...(career.topSkills || []).map((skill) => skill?.name),
+  ]
+    .map(normalize)
+    .filter(Boolean)
+    .join(" ");
+
+const buildFallbackRecommendations = (profile, marketCareers = []) => {
+  const userSkills = (profile.skills || [])
+    .map((skill) => normalize(skill.name))
+    .filter(Boolean);
+  const userInterests = (profile.interests || [])
+    .map((interest) => normalize(interest))
+    .filter(Boolean);
+  const targetCareer = normalize(profile.targetCareer);
+  const fieldOfStudy = normalize(profile.fieldOfStudy);
+
+  const sourceCareers = marketCareers.length
+    ? marketCareers.map((career) => ({
+        careerId: career.careerId,
+        title: career.title,
+        category: career.category,
+        description: career.description,
+        demandLevel: career.demandLevel,
+        growthRate: career.growthRate,
+        averageSalary: career.averageSalary,
+        topSkills: career.topSkills || [],
+        aliases: career.aliases || [],
+        learningPaths: career.learningPaths || [],
+        salaryRange: career.averageSalary
+          ? { min: career.averageSalary.entry, max: career.averageSalary.senior }
+          : undefined,
+      }))
+    : CAREER_FALLBACKS;
+
+  const scored = sourceCareers.map((career) => {
+    const careerKeywords = getCareerKeywords(career);
+    const topSkillNames = (career.topSkills || career.requiredSkills || [])
+      .map((skill) => normalize(skill.name || skill))
+      .filter(Boolean);
+
+    const skillMatches = topSkillNames.filter((skill) =>
+      userSkills.some((userSkill) => skill.includes(userSkill) || userSkill.includes(skill)),
     );
 
-    const interestBoost = career.requiredSkills.some((required) => userText.includes(required)) ? 8 : 0;
-    const baseScore = 40 + skillMatches.length * 12 + interestBoost;
-    const matchScore = Math.max(35, Math.min(96, baseScore));
+    const textMatches = [targetCareer, fieldOfStudy, ...userInterests]
+      .filter(Boolean)
+      .reduce((count, token) => count + (careerKeywords.includes(token) ? 1 : 0), 0);
 
-    const skillGaps = career.requiredSkills
-      .filter((required) =>
-        !userSkills.some((skill) => skill.includes(required) || required.includes(skill)),
-      )
+    const targetBoost = targetCareer && careerKeywords.includes(targetCareer) ? 16 : 0;
+    const interestBoost = textMatches * 5;
+    const skillBoost = skillMatches.length * 14;
+    const demandBoost = career.demandLevel === "Very High" ? 12 : career.demandLevel === "High" ? 8 : career.demandLevel === "Medium" ? 4 : 0;
+    const growthBoost = Math.min(10, Math.max(0, Number(career.growthRate || 0) / 4));
+    const baseScore = 35 + targetBoost + interestBoost + skillBoost + demandBoost + growthBoost;
+    const matchScore = Math.max(30, Math.min(98, Math.round(baseScore)));
+
+    const skillGaps = topSkillNames
+      .filter((required) => !userSkills.some((skill) => skill.includes(required) || required.includes(skill)))
       .slice(0, 4)
       .map((gap) => gap.toUpperCase());
 
     return {
       careerId: career.careerId,
       title: career.title,
+      category: career.category,
       matchScore,
       description: career.description,
       salaryRange: career.salaryRange,
-      demand: career.demand,
+      demand: career.demandLevel || career.demand,
+      demandLevel: career.demandLevel,
+      growthRate: career.growthRate,
+      averageSalary: career.averageSalary,
       skillGaps,
+      topSkills: career.topSkills,
       learningPaths: career.learningPaths,
     };
   });
 
-  return scored.sort((a, b) => b.matchScore - a.matchScore).slice(0, 6);
+  return scored.sort((a, b) => b.matchScore - a.matchScore).slice(0, 10);
+};
+
+const enrichRecommendations = (recommendations = [], marketCareers = []) => {
+  const marketIndex = createCareerIndex(marketCareers);
+  return recommendations.map((recommendation) =>
+    enrichRecommendationWithMarketData(recommendation, marketIndex),
+  );
 };
 
 // @desc    Generate career recommendations via ML service
@@ -154,6 +219,8 @@ const generateRecommendations = async (req, res, next) => {
         message: "Please complete your profile before getting recommendations",
       });
     }
+
+    const marketCareers = await MarketData.find({ region: "Nigeria" }).lean();
 
     const payload = {
       user_id: req.user._id.toString(),
@@ -174,24 +241,30 @@ const generateRecommendations = async (req, res, next) => {
     } catch (mlError) {
       console.error("ML service error:", mlError.message);
       mlResponse = {
-        recommendations: buildFallbackRecommendations(profile),
+        recommendations: buildFallbackRecommendations(profile, marketCareers),
       };
       usedFallback = true;
     }
 
+    const enrichedRecommendations = enrichRecommendations(
+      mlResponse.recommendations || [],
+      marketCareers,
+    );
+
     const recommendation = await Recommendation.create({
       user: req.user._id,
-      careers: mlResponse.recommendations,
+      careers: enrichedRecommendations,
       inputSnapshot: {
         skills: (profile.skills || []).map((s) => ({ name: s.name, level: s.level })),
         interests: profile.interests || [],
       },
     });
+    const recommendationCount = mlResponse.recommendations?.length || 0;
 
     await ActivityLog.create({
       user: req.user._id,
       action: "recommendation_generated",
-      description: `Generated ${mlResponse.recommendations.length} career recommendations`,
+      description: `Generated ${recommendationCount} career recommendations`,
     });
 
     res.json({

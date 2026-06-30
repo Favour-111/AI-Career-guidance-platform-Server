@@ -1,5 +1,10 @@
 const MarketData = require("../models/MarketData");
 const ActivityLog = require("../models/ActivityLog");
+const {
+  fetchLiveMarketSnapshot,
+  mergeMarketInsights,
+  findCareerMatch,
+} = require("../utils/marketInsights");
 
 // @desc    Get all market data / trending careers
 // @route   GET /api/market/careers
@@ -102,11 +107,23 @@ const getMarketStats = async (req, res, next) => {
 // @access  Private
 const getCareerMarketData = async (req, res, next) => {
   try {
-    const career = await MarketData.findOne({ careerId: req.params.careerId, region: "Nigeria" });
+    const career = await MarketData.findOne({
+      careerId: req.params.careerId,
+      region: "Nigeria",
+    }).lean();
     if (!career) {
       return res.status(404).json({ message: "Career data not found" });
     }
-    res.json({ career });
+
+    const liveSnapshot = await fetchLiveMarketSnapshot({
+      query: career.aliases?.[0] || career.title,
+      category: career.category,
+    });
+
+    res.json({
+      career: mergeMarketInsights(career, liveSnapshot),
+      liveSnapshot,
+    });
   } catch (error) {
     next(error);
   }
@@ -157,6 +174,48 @@ const CAREER_TO_MUSE_CATEGORY = (q) => {
   return null;
 };
 
+const sanitizeQuery = (value) =>
+  String(value || "")
+    .replace(/[^a-zA-Z0-9\s\-]/g, "")
+    .trim()
+    .slice(0, 100);
+
+const buildFallbackLiveJobs = ({ query, career, museCategory }) => {
+  const roleTitle = career?.title || query || "Software Engineer";
+  const companies = career?.companies?.length
+    ? career.companies
+    : ["Local employers", "Remote teams", "Growing startups"];
+  const tags = [...new Set((career?.topSkills || []).map((skill) => skill.name).filter(Boolean))].slice(0, 3);
+  const titlePrefixes = ["Junior", "Mid-level", "Senior", "Lead", "Remote", "Contract"];
+  const locations = ["Lagos, Nigeria", "Abuja, Nigeria", "Remote / Nigeria", "Hybrid / Nigeria"];
+  const now = new Date().toISOString();
+
+  const jobs = companies.slice(0, 6).map((company, index) => ({
+    id: `${career?.careerId || "fallback"}-${index}`,
+    title: `${titlePrefixes[index % titlePrefixes.length]} ${roleTitle}`,
+    company,
+    location: locations[index % locations.length],
+    salary: null,
+    type: career?.remote ? "Remote" : "Full-time",
+    tags,
+    url: `https://www.google.com/search?q=${encodeURIComponent(`${company} ${roleTitle} jobs`)}`,
+    description: `Cached market suggestion for ${roleTitle} at ${company}. ${
+      career?.description || `Explore openings related to ${query}.`
+    }`,
+    published: now,
+  }));
+
+  return {
+    jobs,
+    total: career?.jobOpenings || jobs.length,
+    query,
+    category: museCategory || career?.category || "All Fields",
+    source: "Cached market data",
+    sourceUrl: null,
+    fallback: true,
+  };
+};
+
 // @desc    Fetch live job listings from The Muse (free, no API key, all career fields)
 // @route   GET /api/market/live-jobs?query=Nurse
 // @access  Private
@@ -165,15 +224,16 @@ const getLiveJobs = async (req, res, next) => {
     const { query = "software engineer" } = req.query;
     const axios = require("axios");
 
-    const safeQuery = query.replace(/[^a-zA-Z0-9\s\-]/g, "").trim().slice(0, 100);
+    const safeQuery = sanitizeQuery(query) || "software engineer";
     const museCategory = CAREER_TO_MUSE_CATEGORY(safeQuery);
 
     // Build base params — category narrows to the right field
     const baseParams = { descending: true };
     if (museCategory) baseParams.category = museCategory;
 
-    // Fetch 2 pages in parallel (~40 jobs) so we have enough to filter from
-    const [r0, r1] = await Promise.all([
+    // Fetch 2 pages in parallel (~40 jobs) so we have enough to filter from.
+    // Use settled promises so one upstream failure does not take the whole endpoint down.
+    const responses = await Promise.allSettled([
       axios.get("https://www.themuse.com/api/public/jobs", {
         params: { ...baseParams, page: 0 },
         timeout: 10000,
@@ -184,10 +244,20 @@ const getLiveJobs = async (req, res, next) => {
       }),
     ]);
 
-    const allResults = [
-      ...(r0.data?.results || []),
-      ...(r1.data?.results || []),
-    ];
+    const fulfilledResponses = responses
+      .filter((result) => result.status === "fulfilled")
+      .map((result) => result.value);
+    const allResults = fulfilledResponses.flatMap((response) => response.data?.results || []);
+
+    if (!allResults.length) {
+      const careers = await MarketData.find({ region: "Nigeria" }).lean();
+      const matchedCareer = findCareerMatch(safeQuery, careers);
+      return res.json(buildFallbackLiveJobs({
+        query: safeQuery,
+        career: matchedCareer,
+        museCategory,
+      }));
+    }
 
     // Score each job: count how many query-title words appear in the job title
     // "Full Stack Web Developer" → ["full","stack","web","developer"]
@@ -228,14 +298,30 @@ const getLiveJobs = async (req, res, next) => {
 
     res.json({
       jobs,
-      total:     r0.data?.total || jobs.length,
+      total:     fulfilledResponses[0]?.data?.total || jobs.length,
       query:     safeQuery,
       category:  museCategory || "All Fields",
       source:    "The Muse",
       sourceUrl: "https://www.themuse.com",
     });
   } catch (error) {
-    next(error);
+    const careers = await MarketData.find({ region: "Nigeria" }).lean().catch(() => []);
+    const matchedCareer = findCareerMatch(sanitizeQuery(req.query?.query), careers);
+
+    console.warn(
+      "[market/live-jobs] Falling back to cached market data:",
+      error.message,
+    );
+
+    return res.json(
+      buildFallbackLiveJobs({
+        query: sanitizeQuery(req.query?.query) || "software engineer",
+        career: matchedCareer,
+        museCategory: CAREER_TO_MUSE_CATEGORY(
+          sanitizeQuery(req.query?.query) || "software engineer",
+        ),
+      }),
+    );
   }
 };
 
